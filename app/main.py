@@ -69,6 +69,7 @@ def readyz():
         )
     return {"ready": True, "db": "up", "cpu_%": cpu, "memoria_%": memoria_usada}
 
+#Linea de testeo
 
 @app.get("/api/estadisticas/mias")
 def mis_estadisticas(usuario: dict = Depends(usuario_actual)):
