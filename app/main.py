@@ -9,7 +9,12 @@ los expone para el dashboard del frontend. Comparte BD y JWT con casino-backend.
 Prefijo de rutas: /api/estadisticas
 """
 import os
+import time
+import psutil
 from contextlib import asynccontextmanager
+
+INICIO = time.time()
+READY_MAX_MEM_PERCENT = float(os.getenv("READY_MAX_MEM_PERCENT", "90"))
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,10 +46,28 @@ app.add_middleware(
 )
 
 
-# TODO (alumno): implementar las rutas de salud que usará Kubernetes:
-#   - liveness: ¿el proceso está vivo? (respuesta simple).
-#   - readiness: ¿está listo para recibir tráfico? Debe verificar la BD.
-# Luego configurar livenessProbe/readinessProbe en el Deployment de EKS.
+@app.get("/livez", tags=["Health"])
+def livez():
+    """Liveness: el proceso está vivo (no depende de BD externa)."""
+    return {"alive": True, "uptime_segundos": round(time.time() - INICIO, 1)}
+
+
+@app.get("/readyz", tags=["Health"])
+def readyz():
+    """Readiness: listo solo si NO esta saturado de memoria (uso real con psutil)."""
+    from .db import ping
+    if not ping():
+        raise HTTPException(status_code=503, detail="Database connection failed")
+        
+    cpu = psutil.cpu_percent(interval=0.1)
+    memoria_usada = psutil.virtual_memory().percent
+    
+    if memoria_usada > READY_MAX_MEM_PERCENT:
+        raise HTTPException(
+            status_code=503,
+            detail={"ready": False, "cpu_%": cpu, "memoria_%": memoria_usada, "umbral_%": READY_MAX_MEM_PERCENT},
+        )
+    return {"ready": True, "db": "up", "cpu_%": cpu, "memoria_%": memoria_usada}
 
 
 @app.get("/api/estadisticas/mias")

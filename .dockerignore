@@ -1,0 +1,12 @@
+pycache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+.git
+.gitignore
+Dockerfile
