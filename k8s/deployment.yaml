@@ -1,0 +1,101 @@
+# Definición de la API de Kubernetes para Despliegues (Deployments)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Nombre del despliegue
+  name: estadisticas-service
+  namespace: default
+  labels:
+    app: estadisticas-service
+spec:
+  # Cantidad inicial de pods a desplegar
+  replicas: 2
+  # Etiqueta que debe coincidir con la de los pods para agruparlos
+  selector:
+    matchLabels:
+      app: estadisticas-service
+  # Definición de los pods que se crearán
+  template:
+    metadata:
+      labels:
+        app: estadisticas-service
+    spec:
+      # Reglas para distribuir los pods entre los distintos nodos (Alta Disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: estadisticas-service
+      containers:
+        - name: estadisticas-service
+          # Imagen construida y almacenada en Amazon ECR
+          image: <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/estadisticas-service:latest
+          # Forzar a descargar siempre la última imagen disponible
+          imagePullPolicy: Always
+          # Puerto expuesto por el contenedor
+          ports:
+            - containerPort: 8006
+              name: http
+          # Inyección de variables de entorno desde ConfigMaps y Secrets
+          env:
+            - name: PORT
+              value: "8006"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: casino-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: casino-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: casino-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: casino-config
+                  key: DB_USER
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: casino-config
+                  key: CORS_ORIGIN
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: casino-secret
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: casino-secret
+                  key: JWT_SECRET
+          # Límites de recursos (CPU y RAM) requeridos para Autoescalado (HPA)
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          # Sonda de Liveness: Verifica que la aplicación esté viva
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8006
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          # Sonda de Readiness: Verifica que la aplicación pueda recibir tráfico
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8006
+            initialDelaySeconds: 10
+            periodSeconds: 5
