@@ -26,6 +26,7 @@ DB_CONFIG = {
     "user": os.getenv("DB_USER", "casino"),
     "password": os.getenv("DB_PASSWORD", "casino"),
     "dbname": os.getenv("DB_NAME", "casino_db"),
+    "sslmode": "require",
 }
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
